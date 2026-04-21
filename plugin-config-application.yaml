@@ -1,18 +1,82 @@
-apiVersion: argoproj.io/v1alpha1
-kind: Application
+apiVersion: argoproj.io/v1alpha1          # ArgoCD Application API version
+kind: Application                        # Defines an ArgoCD Application resource
 metadata:
-  name: plugin-configuration
-  namespace: argocd
+  name: plugin-configuration             # Name of the ArgoCD application
+  namespace: argocd                      # Must be inside argocd namespace
+
 spec:
-  project: default
+  project: default                       # ArgoCD project (logical grouping)
+
   source:
-    repoURL: 'https://github.com/abohmeed/argocdplugin-terraform-lab.git'
-    targetRevision: HEAD
-    path: 'configurations'
+    repoURL: 'https://github.com/vidhya101/argocdplugin-terraform-lab.git'   # Git repository containing manifests
+    targetRevision: HEAD                # Always pull latest commit from default branch
+    path: 'configurations'              # Folder path inside repo where manifests are stored
+
   destination:
-    server: 'https://kubernetes.default.svc'
-    namespace: default
+    server: 'https://kubernetes.default.svc'   # Target Kubernetes cluster (in-cluster)
+    namespace: default                         # Namespace where resources will be deployed
+
   syncPolicy:
-    automated:
-      selfHeal: true
-      prune: true
+    automated:                        # Enables auto-sync (GitOps mode)
+      selfHeal: true                  # If cluster state drifts → ArgoCD fixes automatically
+      prune: true                     # Removes resources deleted from Git repo
+
+
+# ============================================================
+# FULL EXPLANATION (INSIDE FILE FOR REFERENCE)
+# ============================================================
+
+# This ArgoCD Application is responsible for deploying the
+# "plugin configuration" (like ConfigMap for Terraform plugin)
+# from a Git repository into the Kubernetes cluster.
+
+# FLOW:
+# 1. ArgoCD watches the Git repo:
+#    https://github.com/vidhya101/argocdplugin-terraform-lab.git
+#
+# 2. It looks inside the "configurations" folder
+#
+# 3. Any YAML files present there (like plugin ConfigMap)
+#    are applied to the Kubernetes cluster
+#
+# 4. This Application ensures plugin is always present and updated
+
+# KEY PURPOSE:
+# This Application is NOT deploying an app directly.
+# It is deploying the CONFIGURATION required for your plugin.
+
+# So effectively:
+# Git repo → ArgoCD → Plugin ConfigMap → Repo-server → Plugin enabled
+
+# WHY THIS IS IMPORTANT:
+# - ArgoCD plugins must exist before Applications use them
+# - This ensures plugin is always deployed and synced
+# - Keeps plugin config under Git (GitOps principle)
+
+# WHAT AUTOMATED SYNC DOES:
+# selfHeal:
+#   If someone deletes or modifies plugin in cluster manually
+#   → ArgoCD restores correct state from Git
+
+# prune:
+#   If plugin config is removed from Git
+#   → ArgoCD deletes it from cluster
+
+# REAL DEVOPS FLOW:
+# 1. This app deploys plugin
+# 2. Another app uses plugin
+# 3. Plugin processes Terraform output
+# 4. App gets dynamic config
+
+# FINAL ARCHITECTURE:
+# Git (configurations) 
+#        ↓
+# ArgoCD Application (this file)
+#        ↓
+# Plugin ConfigMap deployed
+#        ↓
+# Repo-server loads plugin
+#        ↓
+# Other apps use plugin
+
+# ============================================================

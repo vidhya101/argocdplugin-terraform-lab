@@ -3,7 +3,7 @@ repoServer:
   - name: my-plugin-terraform
     command:
     - "/var/run/argocd/argocd-cmp-server"
-    image: afakharany/argocd-terraform-plugin:1.0
+    image: vidhya101/argocd-terraform-plugin:1.0
     securityContext:
       runAsNonRoot: true
       runAsUser: 999
