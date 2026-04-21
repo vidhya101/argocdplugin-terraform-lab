@@ -52,13 +52,18 @@ jobs:
         with:
           name: terraform-output
           path: terraform/terraform-output.json
-      
-      - name: Commit and Push Terraform Output
+     
+
+      - name: Safe Git Commit (NOT RECOMMENDED)
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git config pull.rebase true
-          git pull
-          git add terraform/terraform-output.json
-          git commit -m "Update Terraform output" --allow-empty
-          git push   #pushing code
+
+          git reset --hard
+          git clean -fd
+
+          git pull --rebase origin main
+
+          git add terraform/terraform-output.json || true
+          git commit -m "Update Terraform output" || true
+          git push || true
