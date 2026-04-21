@@ -60,4 +60,4 @@ jobs:
           git pull
           git add terraform/terraform-output.json
           git commit -m "Update Terraform output" --allow-empty
-          git push
+          git push   #pushing code
