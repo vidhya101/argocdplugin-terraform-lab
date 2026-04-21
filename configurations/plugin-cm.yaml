@@ -1,24 +1,82 @@
-apiVersion: v1
-kind: ConfigMap
+apiVersion: v1                           # Kubernetes core API version
+kind: ConfigMap                          # We are creating a ConfigMap to store plugin configuration
 metadata:
-  name: terraform-plugin-config
-  namespace: argocd
+  name: terraform-plugin-config          # Name of the ConfigMap (used by ArgoCD repo-server)
+  namespace: argocd                      # Must be in argocd namespace for plugin discovery
+
 data:
-  plugin.yaml: |
-    apiVersion: argoproj.io/v1alpha1
-    kind: ConfigManagementPlugin
+  plugin.yaml: |                         # Embedding plugin YAML as string inside ConfigMap
+
+    apiVersion: argoproj.io/v1alpha1     # ArgoCD plugin API version
+    kind: ConfigManagementPlugin         # Defines a custom ArgoCD plugin
     metadata:
-      name: terraform-plugin
+      name: terraform-plugin             # Plugin name (referenced in ArgoCD Application)
+
     spec:
-      version: v1.0
-      generate:
+      version: v1.0                      # Versioning for plugin tracking
+
+      generate:                          # Core logic: generates Kubernetes manifests dynamically
         command:
-        - sh
-        - -c
+        - sh                             # Use shell interpreter
+        - -c                             # Execute command as string
         args:
         - |
+          # Step 1: Read terraform-output.json file
+          # Extract db_instance_endpoint.value
+          # Split "host:port" → take only host
+          # Remove newline characters
           export ENDPOINT=$(jq -r '.db_instance_endpoint.value | split(":")[0]' < ./terraform-output.json | tr -d '\n') && \
-          echo "{\"kind\": \"ConfigMap\",\"apiVersion\": \"v1\",\"metadata\": {\"name\": \"$ARGOCD_APP_NAME\",\"namespace\": \"$ARGOCD_APP_NAMESPACE\"}, \"data\": {\"mysqlHost\": \"$ENDPOINT\"}}"
-      
-      discover:
-        fileName: "./terraform-output.json"
+
+          # Step 2: Dynamically generate Kubernetes ConfigMap
+          # Using extracted DB endpoint as value
+          echo "{
+            \"kind\": \"ConfigMap\",
+            \"apiVersion\": \"v1\",
+            \"metadata\": {
+              \"name\": \"$ARGOCD_APP_NAME\",            # Uses ArgoCD app name dynamically
+              \"namespace\": \"$ARGOCD_APP_NAMESPACE\"   # Uses target namespace automatically
+            },
+            \"data\": {
+              \"mysqlHost\": \"$ENDPOINT\"               # Injects DB endpoint into ConfigMap
+            }
+          }"
+
+      discover:                          # Controls when plugin should be triggered
+        fileName: "./terraform-output.json"   # If this file exists → plugin executes
+        
+
+# ============================================================
+# FULL EXPLANATION (INSIDE FILE FOR REFERENCE)
+# ============================================================
+
+# This ConfigMap defines a custom ArgoCD Config Management Plugin (CMP)
+# which allows ArgoCD to process Terraform output and convert it into
+# Kubernetes resources dynamically.
+
+# FLOW:
+# 1. Terraform runs and creates infrastructure (RDS instance)
+# 2. Terraform generates output file: terraform-output.json
+# 3. ArgoCD detects this file using "discover"
+# 4. Plugin runs "generate" block
+# 5. jq extracts DB endpoint from JSON
+# 6. Plugin dynamically builds a Kubernetes ConfigMap
+# 7. ArgoCD applies this ConfigMap into cluster
+
+# KEY PURPOSE:
+# Connect Terraform (infrastructure layer) with Kubernetes (application layer)
+# without manual intervention.
+
+# RESULT:
+# Kubernetes applications can now read:
+# mysqlHost → RDS endpoint
+
+# WHY THIS IS POWERFUL:
+# - Enables Infra → App integration
+# - Fully automated GitOps workflow
+# - No hardcoding of endpoints
+# - Dynamic environment configuration
+
+# REAL DEVOPS USE CASE:
+# Terraform provisions DB → ArgoCD injects endpoint → App connects automatically
+
+# ============================================================
